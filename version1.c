@@ -3,6 +3,7 @@
 #include <math.h>
 #include <complex.h>
 #include<string.h>
+#include <time.h>
 
 int cutoff = 2;
 float complex* destroy_op; 
@@ -20,10 +21,10 @@ float complex* matrix_mul(float complex* matrix1, int size1, float complex* matr
 float complex* tensor_product(float complex* op1, int size1, float complex* op2, float complex* result);
 
 // Define the arnoldi lindbard time evolution
-float complex* arnoldilindbard( //fill paramters as you write the logic)
+/*float complex* arnoldilindbard( //fill paramters as you write the logic)
 {
 	
-}
+}*/
 
 
 // Define the conjugate transpose function
@@ -119,7 +120,7 @@ int main() {
     
     
     float complex H[size*size]; //Hamiltonian H
-    float complex vec_init[size*size];
+    float vec_init[size*size];
     int k=0;
     int delta = 5;
     int gamma=1;
@@ -480,19 +481,40 @@ int main() {
 	
 	
    // Create the initial density matrix
-   vec_init
+   srand(time(NULL));
+    float sum = 0.0f;
+
+    // Generate random numbers for the vector
+    for (int i = 0; i < totalsize; i++) {
+        vec_init[i] = (float)rand() / RAND_MAX;
+    }
+
+    for (int i = 0; i < totalsize; i++) {
+        sum += vec_init[i];
+    }
+
+    // Normalize the vector by dividing each element by the sum
+    for (int i = 0; i < totalsize; i++) {
+        vec_init[i] /= sum;
+    }
+
+    // Print the normalized vector
+    for (int i = 0; i < totalsize; i++) {
+        printf("%f\n", vec_init[i]);
+    }
+
 	
    // Printing the liouvillian array
     
   
-  printf("Value of liouvillian ");
+  /*printf("Value of liouvillian ");
    for (int i = 0; i < totalsize; i++) {
         for (int j = 0; j < totalsize; j++) { 	
         			printf("for the index %d : %.2f + %.2fi", (i*totalsize+j),creal(li_result[i*totalsize+j]),cimag(li_result[i*totalsize+j]));	
         		
        
       	}
-  }
+  }*/
  
     free(destroy_op);
     return 0;
