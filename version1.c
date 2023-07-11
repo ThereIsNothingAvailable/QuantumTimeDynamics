@@ -21,11 +21,52 @@ float complex* matrix_mul(float complex* matrix1, int size1, float complex* matr
 float complex* tensor_product(float complex* op1, int size1, float complex* op2, float complex* result);
 
 // Define the arnoldi lindbard time evolution
-/*float complex* arnoldilindbard( //fill paramters as you write the logic)
+float complex* arnoldilindbard(float complex* op,float complex* dis_ops, float complex* rho,int n,int T,int numsteps,char* condition,int tau, int min_check, int how_often)
 {
-	
-}*/
+	return op;	
+}
 
+//Define the do_lioulivillian 
+float complex* do_liouvillian(float complex* rho, float complex* H, int size, float complex** cc_ops, int num_ops) {
+    float complex* Lrho = (float complex*)malloc(size * size * sizeof(float complex));
+    float complex* temp1 = (float complex*)malloc(size * size * sizeof(float complex));
+    float complex* temp2 = (float complex*)malloc(size * size * sizeof(float complex));
+    float complex* temp3 = (float complex*)malloc(size * size * sizeof(float complex));
+    float complex* temp4 = (float complex*)malloc(size * size * sizeof(float complex));
+
+    // Calculate -1.j * (HH * rho - rho * HH)
+    matrix_mul(H,size, rho, size, temp1);
+    matrix_mul(rho,size, H, size, temp2);
+    for (int i = 0; i < size * size; i++) {
+        Lrho[i] = -1.0 * cimag(1) * (temp1[i] - temp2[i]);
+    }
+
+    // Calculate Liouvillian terms for each jump operator
+    for (int op = 0; op < num_ops; op++) {
+        // Calculate jump * rho * jump^H
+        dag(cc_ops[op],size,temp4);
+        matrix_mul(rho,size,temp4,size,temp1);
+        matrix_mul(cc_ops[op],size,temp1, size, temp2);
+        for (int i = 0; i < size * size; i++) {
+            Lrho[i] += temp2[i];
+        }
+
+        // Calculate -0.5 * (rho * jump^H * jump + jump^H * jump * rho)
+        matrix_mul(temp4,size, cc_ops[op], size, temp1);
+        matrix_mul(rho,size, temp1, size, temp2);
+        matrix_mul(temp1,size, rho, size, temp3);
+        for (int i = 0; i < size * size; i++) {
+            Lrho[i] -= 0.5 * (temp2[i] + temp3[i]);
+        }
+    }
+
+    free(temp1);
+    free(temp2);
+    free(temp3);
+    free(temp4);
+
+    return Lrho;
+}
 
 // Define the conjugate transpose function
 float complex* dag(float complex* op, int size, float complex* dag_res){
@@ -295,15 +336,6 @@ int main() {
     }
    }
    
-   /*printf("Value of:  ");
-   for (int i = 0; i < size; i++) {
-        for (int j = 0; j < size; j++) {
-        			printf("for the index %d : %.2f + %.2fi", (i*size+j),creal(H[i*size+j]),cimag(H[i*size+j]));	
-        			
-       
-      	}
-  }*/
-
    
    // Build the c_ops list
    for (int j = 0; j < size; j++) {
@@ -364,6 +396,7 @@ int main() {
        
       	}
   }
+
 	
 	float complex* id_h= tensor_product(identity_op, size, H, tensor_result1);
 	
@@ -502,6 +535,10 @@ int main() {
     for (int i = 0; i < totalsize; i++) {
         printf("%f\n", vec_init[i]);
     }
+    
+    //Arnoldi lindbard time evolution function definition
+    float complex* ans[size*size];
+    //ans = arnoldilindbard(H,c_ops,vec_init,100,100000,100,"steady_state",10*(-3),100,20);
 
 	
    // Printing the liouvillian array
