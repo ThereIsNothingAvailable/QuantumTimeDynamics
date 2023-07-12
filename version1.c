@@ -19,11 +19,51 @@ float complex* destroy_operator(float complex* destroy_op, int cutoff);
 float complex* dag(float complex* op, int size, float complex* dag_res);
 float complex* matrix_mul(float complex* matrix1, int size1, float complex* matrix2, int size2, float complex* result);
 float complex* tensor_product(float complex* op1, int size1, float complex* op2, float complex* result);
+float complex* normalize_vector(float complex* q, int size);
 
 // Define the arnoldi lindbard time evolution
-float complex* arnoldilindbard(float complex* op,float complex* dis_ops, float complex* rho,int n,int T,int numsteps,char* condition,int tau, int min_check, int how_often)
+float complex* arnoldilindbard(float complex* op,float complex* dis_ops, float complex* rho,int size,int n,int T,int numsteps,char* condition,int tau, int min_check, int how_often)
 {
-	return op;	
+    int k =0;
+    int totalsize = size*size;
+    int m = size;
+    int sqrtm = sqrt(m);
+    // Creating an initial density matrix
+    float complex* initial_dm = (float complex*)malloc(size * size * sizeof(float complex));
+    float complex* h = (float complex*)malloc((n+1) * n * sizeof(float complex));
+    float complex* Q = (float complex*)malloc(m * (n+1) * sizeof(float complex));
+    double *tlist = (double *)malloc(numsteps * sizeof(double));
+    for(int i = 0;i<size*size;i++)
+    {
+    	initial_dm[i] = rho[i];
+    }
+    normalize_vector(initial_dm,totalsize);
+    //building the first krylov subspace
+    for(int i=0;i<size;i++)
+    {
+    	for(int j=0;j<(n+1);j++)
+    	{
+    		if(j == 0){
+    			Q[i*size + j] = initial_dm[k];
+    			k++;
+    		}
+    		else{
+    			Q[i*size+j]=creal(0)+cimag(0);
+    		}
+    	}
+    }
+    
+    double dt = T / (numsteps - 1);
+    for (int i = 0; i < numsteps; i++) {
+        tlist[i] = i * dt;
+    }
+    
+    
+    
+    free(initial_dm);
+    free(h);
+    free(Q);
+    free(tlist);	
 }
 
 //Define the do_lioulivillian 
@@ -67,6 +107,24 @@ float complex* do_liouvillian(float complex* rho, float complex* H, int size, fl
 
     return Lrho;
 }
+
+// Define the normalize vector function
+float complex* normalize_vector(float complex* q, int size) {
+    float complex norm = 0.0 + 0.0 * I;
+
+    // Compute the norm of the vector
+    for (int i = 0; i < size; i++) {
+        norm += creal(q[i]) * creal(q[i]) + cimag(q[i]) * cimag(q[i]);
+    }
+    norm = csqrt(norm);
+
+    // Normalize the vector by dividing each element by the norm
+    for (int i = 0; i < size; i++) {
+        q[i] /= norm;
+    }
+    return q;
+}
+
 
 // Define the conjugate transpose function
 float complex* dag(float complex* op, int size, float complex* dag_res){
@@ -136,6 +194,7 @@ float complex* identity_operator(float complex* identity_op, int cutoff) {
         }
     }
 }
+
 
 int main() {
     int cutoff = 2;
@@ -444,6 +503,7 @@ int main() {
        
       	}
   }
+  
 	
 	// Define the matrix multiplication
 	float complex* c1dag_c1 = matrix_mul(c1dag,size,cop1,size,matrixmul);
@@ -454,14 +514,16 @@ int main() {
        
       	}
   }
+  
 	float complex* c2dag_c2 = matrix_mul(c2dag,size,cop2,size,matrixmul);
 	for (int i = 0; i < size; i++) {
         for (int j = 0; j < size; j++) {
         			c2dagc2[i*size + j] = c2dag_c2[i*size + j];	
         			
        
-      	}
-  }
+      	}}
+      	
+  
 	
 	// Define the tensor products for 1_c2dagc1, c2dagc1_1
 	float complex* id_c1dagc1 = tensor_product(identity_op, size, c1dagc1, tensor_result1);
@@ -550,10 +612,8 @@ int main() {
         			printf("for the index %d : %.2f + %.2fi", (i*totalsize+j),creal(li_result[i*totalsize+j]),cimag(li_result[i*totalsize+j]));	
         		
        
-      	}
-  }*/
+      	}}*/
  
     free(destroy_op);
     return 0;
-}
-   
+    }
