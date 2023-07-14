@@ -5,6 +5,7 @@
 #include<string.h>
 #include <time.h>
 
+
 int cutoff = 2;
 float complex* destroy_op; 
 float complex* identity_op;
@@ -20,19 +21,21 @@ float complex* dag(float complex* op, int size, float complex* dag_res);
 float complex* matrix_mul(float complex* matrix1, int size1, float complex* matrix2, int size2, float complex* result);
 float complex* tensor_product(float complex* op1, int size1, float complex* op2, float complex* result);
 float complex* normalize_vector(float complex* q, int size);
+void arnoldi(float complex *A, int N, float complex *v, int m, int n, float complex *H, float complex *Q);
 
 // Define the arnoldi lindbard time evolution
-float complex* arnoldilindbard(float complex* op,float complex* dis_ops, float complex* rho,int size,int n,int T,int numsteps,char* condition,int tau, int min_check, int how_often)
+void arnoldilindbard(float complex* op,float complex** dis_ops, float* rho,int size,int n,int T,int numsteps,char* condition,int tau, int min_check, int how_often, float complex* li_result)
 {
     int k =0;
     int totalsize = size*size;
     int m = size;
     int sqrtm = sqrt(m);
     // Creating an initial density matrix
-    float complex* initial_dm = (float complex*)malloc(size * size * sizeof(float complex));
+    float complex* initial_dm = (float complex*)malloc(size * size * sizeof(float complex)); //q matrix
     float complex* h = (float complex*)malloc((n+1) * n * sizeof(float complex));
     float complex* Q = (float complex*)malloc(m * (n+1) * sizeof(float complex));
     double *tlist = (double *)malloc(numsteps * sizeof(double));
+    
     for(int i = 0;i<size*size;i++)
     {
     	initial_dm[i] = rho[i];
@@ -53,18 +56,104 @@ float complex* arnoldilindbard(float complex* op,float complex* dis_ops, float c
     	}
     }
     
+    
     double dt = T / (numsteps - 1);
     for (int i = 0; i < numsteps; i++) {
         tlist[i] = i * dt;
     }
+    arnoldi(li_result,totalsize,initial_dm,size,n,h,Q);
     
-    
+    printf("Q:\n");
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n + 1; j++) {
+            printf("%.2f + %.2fi", creal(Q[i * (m + 1) + j]),cimag(Q[i * (m + 1) + j]));
+        }
+        printf("\n");
+    }
+
+    printf("\nH:\n");
+    for (int i = 0; i < n+1; i++) {
+        for (int j = 0; j < n; j++) {
+            printf("%.2f + %.2fi", creal(h[i * m + j]),cimag(h[i * m + j]));
+        }
+        printf("\n");
+    }
     
     free(initial_dm);
     free(h);
     free(Q);
-    free(tlist);	
+    free(tlist);
 }
+
+// Define the arnoldi iteration
+void arnoldi(float complex *A, int N, float complex *v, int m, int n,float complex *H, float complex *Q){
+    float complex *v_k = (float complex *)malloc(N * sizeof(float complex));
+    float complex *q_k = (float complex *)malloc(N * sizeof(float complex));
+    float complex *h_k = (float complex *)malloc((m + 1) * m * sizeof(float complex));
+
+    // Initialize Q as the identity matrix
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < (n+1); j++) {
+            Q[i * m + j] = (i == j) ? 1.0 : 0.0;
+        }
+    }
+
+    for (int k = 0; k < (n+1); k++) {
+        // Extract the k-th column of Q
+        for (int i = 0; i < m; i++) {
+            q_k[i] = Q[i * m + k];
+        }
+
+        // Perform matrix-vector multiplication: v_k = A * q_k
+        for (int i = 0; i < N; i++) {
+            v_k[i] = 0.0;
+            for (int j = 0; j < N; j++) {
+                v_k[i] += A[i * n + j] * q_k[j];
+            }
+        }
+
+        // Orthogonalization using modified Gram-Schmidt
+        for (int j = 0; j <= k; j++) {
+            // Extract the j-th column of Q
+            for (int i = 0; i < m; i++) {
+                q_k[i] = Q[i * m + j];
+            }
+
+            // Compute the projection: h_k[j] = q_k^T * v_k
+            h_k[j * m + k] = 0.0;
+            for (int i = 0; i < n; i++) {
+                h_k[j * m + k] += q_k[i] * v_k[i];
+            }
+
+            // Subtract the projection: v_k = v_k - h_k[j] * q_k
+            for (int i = 0; i < N; i++) {
+                v_k[i] -= h_k[j * m + k] * q_k[i];
+            }
+        }
+
+        // Compute the new column of Q: q_k+1 = v_k / ||v_k||
+        double norm_v_k = 0.0;
+        for (int i = 0; i < N; i++) {
+            norm_v_k += v_k[i] * v_k[i];
+        }
+        norm_v_k = sqrt(norm_v_k);
+
+        for (int i = 0; i < N; i++) {
+            Q[i * m + k + 1] = v_k[i] / norm_v_k;
+        }
+
+        // Set the lower triangle of H_k to the projection coefficients
+        for (int j = 0; j <= k; j++) {
+            H[j * m + k] = h_k[j * m + k];
+        }
+    }
+    
+    
+    free(v_k);
+    free(q_k);
+    free(h_k);
+}
+
 
 //Define the do_lioulivillian 
 float complex* do_liouvillian(float complex* rho, float complex* H, int size, float complex** cc_ops, int num_ops) {
@@ -184,6 +273,7 @@ float complex* destroy_operator(float complex* destroy_op, int cutoff) {
       		}
       	}
       }
+     return destroy_op;
 }
 
 // Define the identity operator
@@ -193,6 +283,7 @@ float complex* identity_operator(float complex* identity_op, int cutoff) {
             identity_op[i*cutoff + j] = (i == j) ? 1 : 0;
         }
     }
+    return identity_op;
 }
 
 
@@ -592,15 +683,11 @@ int main() {
     for (int i = 0; i < totalsize; i++) {
         vec_init[i] /= sum;
     }
-
-    // Print the normalized vector
-    for (int i = 0; i < totalsize; i++) {
-        printf("%f\n", vec_init[i]);
-    }
     
     //Arnoldi lindbard time evolution function definition
-    float complex* ans[size*size];
-    //ans = arnoldilindbard(H,c_ops,vec_init,100,100000,100,"steady_state",10*(-3),100,20);
+    //float complex* ans[size*size];
+    //float complex* op,float complex* dis_ops, float complex* rho,int size,int n,int T,int numsteps,char* condition,int tau, int min_check, int how_often, float complex* li_result
+    arnoldilindbard(H,c_ops,vec_init,size,250,10,100,"steady_state",10*(-3),80,10,li_result);
 
 	
    // Printing the liouvillian array
@@ -613,7 +700,6 @@ int main() {
         		
        
       	}}*/
- 
-    free(destroy_op);
+
     return 0;
     }
