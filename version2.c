@@ -222,7 +222,6 @@ int main() {
     }
    }
    
-   
    // Build the c_ops list
    for (int j = 0; j < size; j++) {
        for (int k = 0; k < size; k++)
@@ -445,7 +444,7 @@ void arnoldilindbard(float complex* op,float complex** dis_ops, float* rho,int s
 {
     int k =0;
     int totalsize = size*size;
-    int m = size;
+    int m = totalsize;
     int sqrtm = sqrt(m);
     // Creating an initial density matrix
     float* initial_dm = (float*)malloc(size * size * sizeof(float)); //q matrix
@@ -453,6 +452,14 @@ void arnoldilindbard(float complex* op,float complex** dis_ops, float* rho,int s
     float complex* Q_1 = (float complex*)malloc(m * (n+1) * sizeof(float complex));
     double *tlist = (double *)malloc(numsteps * sizeof(double));
     
+    // Creating the h matrix as a null matrix first
+    for(int i=0;i<(n+1);i++)
+    {
+    	for(int j=0;j<n;j++)
+    	{
+    		h[i*(n+1) +j] =0;
+    	}
+    }
     
     for(int i = 0;i<size*size;i++)
     {
@@ -460,16 +467,16 @@ void arnoldilindbard(float complex* op,float complex** dis_ops, float* rho,int s
     }
     normalize_vector(initial_dm,totalsize);
     //building the first krylov subspace
-    for(int i=0;i<size;i++)
+    for(int i=0;i<m;i++)
     {
     	for(int j=0;j<(n+1);j++)
     	{
     		if(j == 0){
-    			Q_1[i*size + j] = initial_dm[k];
+    			Q_1[i*(n+1) + j] = initial_dm[k];
     			k++;
     		}
     		else{
-    			Q_1[i*size+j]=creal(0)+cimag(0);
+    			Q_1[i*(n+1)+j]=creal(0)+cimag(0);
     		}
     	}
     }
@@ -479,17 +486,9 @@ void arnoldilindbard(float complex* op,float complex** dis_ops, float* rho,int s
     for (int i = 0; i < numsteps; i++) {
         tlist[i] = i * dt;
     }
-    arnoldi(li_result,totalsize,initial_dm,size,n,h,Q_1);
+    arnoldi(li_result,totalsize,initial_dm,m,n,h,Q_1);
     
-  
-
-    /*printf("\nH:\n");
-    for (int i = 0; i < n+1; i++) {
-        for (int j = 0; j < n; j++) {
-            printf("%.2f + %.2fi", creal(h[i * m + j]),cimag(h[i * m + j]));
-        }
-        printf("\n");
-    }*/
+ 
     
     free(initial_dm);
     free(h);
@@ -497,36 +496,31 @@ void arnoldilindbard(float complex* op,float complex** dis_ops, float* rho,int s
     free(tlist);
 }
 
-//Problem with the logic, both H and Q giving only zeros (check other avaiable subroutines)
 // Define the arnoldi iteration
 void arnoldi(float complex *A, int N, float *v, int m, int n, float complex *H, float complex *Q) {
     float complex *v_k = (float complex *)malloc(N * sizeof(float complex));
     float complex *q_k = (float complex *)malloc(m * sizeof(float complex));
     float complex *h_k = (float complex *)malloc((n + 1) * n * sizeof(float complex));
+    //float complex ritz_values[];
 
-  
-    // Initialize Q as the identity matrix
-         for (int i = 0; i < m; i++) {
-            for (int j = 0; j < (n + 1); j++) {
-               Q[i * (n + 1) + j] = (i == j) ? 1.0 : 0.0;
-           }
-         }
 
          for (int k = 0; k < (n + 1); k++) {
             // Extract the k-th column of Q
              for (int i = 0; i < m; i++) {
                q_k[i] = Q[i * (n + 1) + k];
+		//printf("%.2f + %.2fi",creal(q_k[i]),cimag(q_k[i]));
              }
-           
+        
 
         // Perform matrix-vector multiplication: v_k = A * q_k
+        
         for (int i = 0; i < N; i++) {
             v_k[i] = 0.0;
             for (int j = 0; j < N; j++) {
-                v_k[i] += A[i * N + j] * q_k[j];
+                v_k[i] = v_k[i]+ q_k[j]*A[j * N + i];
             }
         }
-
+        
         // Orthogonalization using modified Gram-Schmidt
         for (int j = 0; j <= k; j++) {
             // Extract the j-th column of Q
@@ -542,47 +536,51 @@ void arnoldi(float complex *A, int N, float *v, int m, int n, float complex *H, 
 
             // Subtract the projection: v_k = v_k - h_k[j] * q_k
             for (int i = 0; i < N; i++) {
-                v_k[i] -= h_k[j * n + k] * q_k[i];
-            }
-        }
+                v_k[i] = v_k[i]- h_k[j * n + k] * q_k[i];
+            }}
 
         // Compute the new column of Q: q_k+1 = v_k / ||v_k||
-        double norm_v_k = 0.0;
+        float complex norm_v_k = creal(0) + cimag(0);
         for (int i = 0; i < N; i++) {
-            norm_v_k += creal(v_k[i]) * creal(v_k[i]) + cimag(v_k[i]) * cimag(v_k[i]);
+            norm_v_k = norm_v_k+ creal(v_k[i]) * creal(v_k[i]) + cimag(v_k[i]) * cimag(v_k[i]);
         }
         norm_v_k = csqrt(norm_v_k);
 
-	// error here
-        for (int i = 0; i < m; i++) {
-            Q[i * (n + 1) + k + 1] = v_k[i] / norm_v_k;
-        }
+	if (norm_v_k != 0.0) {
+	    for (int i = 0; i < m; i++) {
+		Q[i * (n + 1) + k + 1] = v_k[i] / norm_v_k;
+	    }}
 
         // Set the upper Hessenberg matrix H_k to the projection coefficients
-        for (int j = 0; j <= k; j++) {
+        for (int j = 0; j < k; j++) {
             H[j * n + k] = h_k[j * n + k];
+            if(H[j * n + k]!=0)
+            {
+            	//printf("%.2f + %.2fi",creal(H[j * n + k]),cimag(H[j * n + k]));	
+            }
+        }
+    } 
+    
+    
+    printf("Q:\n");
+    for (int i = 0; i < m; i++) {
+        for (int j = 0; j < n+1; j++) {
+        	if(creal(Q[i*(n+1) + j])!=.0f){
+        		printf("for index %d: %.2f + %.2fi", (i*(n+1) + j),creal(Q[i*(n+1) + j]),cimag(Q[i*(n+1) + j]));
+        	}
+           
         }
     }
-
-    /*printf("Q:\n");
-    for (int i = 0; i < m; i++) {
-        for (int j = 0; j < n + 1; j++) {
-            printf("%.2f + %.2fi ", creal(Q[i * (n + 1) + j]), cimag(Q[i * (n + 1) + j]));
-        }
-        printf("\n");
-    }*/
     
-    printf("\nH:\n");
+    
+    /* printf("H:\n");
     for (int i = 0; i < n+1; i++) {
         for (int j = 0; j < n; j++) {
-        	if(creal(H[i * m + j])!=0)
-        	{
-        		printf("%.2f + %.2fi", creal(H[i * m + j]),cimag(H[i * m + j]));	
-        	}
+        		printf("for index %d: %.28f + %.28fi", (i*(n) + j),creal(H[i*(n) + j]),cimag(H[i*(n) + j]));
+           
         }
+    }*/
         //printf("\n");
-    }
-
     //free(v_k);
     //free(q_k);
     //free(h_k);
