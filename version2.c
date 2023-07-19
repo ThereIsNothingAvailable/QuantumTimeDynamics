@@ -4,6 +4,12 @@
 #include <complex.h>
 #include<string.h>
 #include <time.h>
+#include "f2c.h"
+#include "blaswrap.h"
+#include "clapack.h"
+
+struct _fcomplex { float re, im; };
+typedef struct _fcomplex fcomplex;
 
 int cutoff = 2;
 float complex* destroy_op; 
@@ -19,10 +25,9 @@ void destroy_operator(float complex* destroy_op, int cutoff);
 float complex* dag(float complex* op, int size, float complex* dag_res);
 float complex* matrix_mul(float complex* matrix1, int size1, float complex* matrix2, int size2, float complex* result);
 float complex* tensor_product(float complex* op1, int size1, float complex* op2, float complex* result);
-void arnoldi(float complex *A, int N, float *v, int m, int n,float complex *H, float complex *Q);
+void arnoldi(float complex *A, int N, float *v, int m, int n,float complex *H, float complex *Q, int min_check, int how_often);
 float* normalize_vector(float* q, int size);
 void arnoldilindbard(float complex* op,float complex** dis_ops, float* rho,int size,int n,int T,int numsteps,char* condition,int tau, int min_check, int how_often, float complex* li_result);
-
 
 int main() {
     int size = cutoff*cutoff; //size of the array
@@ -451,6 +456,9 @@ void arnoldilindbard(float complex* op,float complex** dis_ops, float* rho,int s
     float complex* h = (float complex*)malloc((n+1) * n * sizeof(float complex));
     float complex* Q_1 = (float complex*)malloc(m * (n+1) * sizeof(float complex));
     double *tlist = (double *)malloc(numsteps * sizeof(double));
+    complex* vals_eff = (complex*)malloc(100 * sizeof(complex));
+    complex* vecs_eff = (complex*)malloc(100 * 100 * sizeof(complex));
+
     
     // Creating the h matrix as a null matrix first
     for(int i=0;i<(n+1);i++)
@@ -488,7 +496,17 @@ void arnoldilindbard(float complex* op,float complex** dis_ops, float* rho,int s
     }
     arnoldi(li_result,totalsize,initial_dm,m,n,h,Q_1);
     
- 
+    /*printf("H:\n");
+    for (int i = 0; i < n+1; i++) {
+        for (int j = 0; j < n; j++) {
+        	if(creal(h[i*(n) + j])!=0.00f)
+        		printf("for index %d: %.2f + %.2fi", (i*(n) + j),creal(h[i*(n) + j]),cimag(h[i*(n) + j]));
+           
+        }
+    }*/
+    
+    factorization(h,n,min_check,how_often);
+   
     
     free(initial_dm);
     free(h);
@@ -559,10 +577,9 @@ void arnoldi(float complex *A, int N, float *v, int m, int n, float complex *H, 
             	//printf("%.2f + %.2fi",creal(H[j * n + k]),cimag(H[j * n + k]));	
             }
         }
-    } 
+        }
     
-    
-    printf("Q:\n");
+    /*printf("Q:\n");
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < n+1; j++) {
         	if(creal(Q[i*(n+1) + j])!=.0f){
@@ -570,20 +587,87 @@ void arnoldi(float complex *A, int N, float *v, int m, int n, float complex *H, 
         	}
            
         }
-    }
-    
-    
-    /* printf("H:\n");
-    for (int i = 0; i < n+1; i++) {
-        for (int j = 0; j < n; j++) {
-        		printf("for index %d: %.28f + %.28fi", (i*(n) + j),creal(H[i*(n) + j]),cimag(H[i*(n) + j]));
-           
-        }
     }*/
-        //printf("\n");
-    //free(v_k);
-    //free(q_k);
-    //free(h_k);
+       
+}
+
+// Define the function factorization to get eigenvalues and eigenvectors
+void factorization(float complex* h, int n, int min_check,int how_often)
+{
+   for(int k=0;k<(n+1);k++)
+   {
+	if(k%how_often==0 && k>min_check){
+        
+          int n = k;
+          fcomplex hes[k*k]; // Submatrix
+          for (int i = 0; i < k; i++) {
+        	for (int j = 0; j < k; j++) {
+            		hes[i*k+j].re = creal(h[i*k+j]);
+            		hes[i*k+j].im = cimag(h[i*k+j]);
+        		}
+    		}
+    		
+    	// LAPACK function to compute eigenvalues and eigenvectors
+    	char jobvl = 'N'; // Compute left eigenvectors (N for no, V for yes)
+    	char jobvr = 'V'; // Compute right eigenvectors (N for no, V for yes)
+   
+    	int lda = n, ldvl = n, ldvr = n, info, lwork;
+    	fcomplex wkopt;
+    	fcomplex* work;
+    	float rwork[2*k];
+    	fcomplex w[k], vl[ldvl*k], vr[ldvr*k];
+
+    	lwork = -1;
+        cgeev_( "Vectors", "Vectors", &n, hes, &lda, w, vl, &ldvl, vr, &ldvr, &wkopt, &lwork, rwork, &info );
+
+	lwork = (int)(wkopt.re);
+	work = (fcomplex*)malloc( lwork*sizeof(fcomplex) );
+	/* Solve eigenproblem */
+	cgeev_( "Vectors", "Vectors", &n, hes, &lda, w, vl, &ldvl, vr, &ldvr, work, &lwork, rwork, &info );
+	    
+	/* Check for convergence */
+	if( info > 0 ) {
+	   printf( "The algorithm failed to compute eigenvalues.\n" );
+	   exit( 1 );
+	 }
+	  
+	  // Print the left eigenvectors (if computed)
+	if (jobvl == 'V') {
+	printf("\nLeft Eigenvectors:\n");
+	    for (int i = 0; i < k; i++) {
+		for (int j = 0; j <k; j++) {
+			if(vl[i*k + j].re != 0.0f)
+		    		printf("%.5f + %.5fi\t", vl[i*k + j].re, vl[i*k + j].im);
+		}
+		printf("\n");
+	    }
+	}    
+
+	// Print the right eigenvectors (if computed)
+	/*if (jobvr == 'V') {
+	    printf("\nRight Eigenvectors:\n");
+	    for (int i = 0; i < k; i++) {
+		for (int j = 0; j < k; j++) {
+			if(vr[i*k + j].re != 0.0f)
+		    		printf("%.5f + %.5fi\t", vr[i*k+j].re, vr[i*k+j].im);
+		}
+		printf("\n");
+	    }
+	}*/	
+	
+	}}
+}
+
+//Define the convergence as required for arnoldi eigenvalues
+int has_converged(double val, double* all_vals, int size, double tolerance) {
+    // Check if the eigenvalue 'val' has converged based on relative differences
+    for (int i = 0; i < size; i++) {
+        double diff = fabs((val - all_vals[i]) / all_vals[i]);
+        if (diff >= tolerance) {
+            return 0; // The eigenvalue has not converged
+        }
+    }
+    return 1; // The eigenvalue has converged
 }
 
 
