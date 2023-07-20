@@ -502,7 +502,7 @@ void arnoldilindbard(float complex* op,float complex** dis_ops, float* rho,int s
         }
     }*/
     
-    factorization(h,Q_1,n,min_check,how_often);
+    factorization(h,Q_1,n,min_check,how_often,m);
    
     
     free(initial_dm);
@@ -578,7 +578,7 @@ void arnoldi(float complex *A, int N, float *v, int m, int n, float complex *H, 
 }
 
 //Define the function factorization to get eigenvalues and eigenvectors
-void factorization(float complex* upper_h, float complex *krylov, int n, int min_check,int how_often)
+void factorization(float complex* upper_h, float complex *krylov, int n, int min_check,int how_often,int m)
 {
    for(int k=0;k<(n+1);k++)
    {
@@ -691,9 +691,35 @@ void factorization(float complex* upper_h, float complex *krylov, int n, int min
 }
 
 // Define the time evolution to get eigenstates of the iterative function within the factorization()
-void time_evolve(float complex* eigenvals, int rows_eigenvals,int cols_eigenvals,float complex* eigenvecs, int rows_eigenvecs, int cols_eigenvecs)
+void time_evolve(float complex* eigenvals, int eigenvals_size,float complex* eigenvecs, int rows_eigenvecs, int cols_eigenvecs, float complex* eigenstates)
 {
-            
+     float complex result[rows_eigenvecs*cols_eigenvecs];
+     float complex values[eigenvals_size];
+     
+     for(int i=0;i<eigenvals_size;i++){
+        values[i]= exp(eigenvals[i]*-1);
+     }
+     
+     for(int i=0;i<rows_eigenvecs;i++)
+  {
+  	for(int j=0;j<cols_eigenvecs;j++)
+  	{
+  		result[j*rows_eigenvecs + i]=conj(eigenvecs[i*cols_eigenvecs + j]); 
+  	}
+  }
+  
+  //Dot product as cols and rows are reversed   
+     for (int i = 0; i < cols_eigenvecs; i++) {
+         for (int j = 0; j < rows_eigenvecs; j++) {
+		result[i*rows_eigenvecs +j] = 0.0;
+		for (int l = 0; l < eigenvals_size; l++) {
+		    result[i*rows_eigenvecs + j] += values[l]*result[l*rows_eigenvecs + j];
+	}
+     }
+   }    
+    
+  //how to do dot product of U with the above as eigenvals is a 1d array (ask???) and then what to do??
+           
 }
 
 
