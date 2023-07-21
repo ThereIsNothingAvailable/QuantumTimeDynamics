@@ -651,7 +651,7 @@ void factorization(float complex* upper_h, float complex *krylov, int n, int min
 		vals_eff[k] = w[k].im;	
 		}
 	 
-	// Create vecs_eff from left eigenvectors and right eigenvectors (how???)
+	// Create vecs_eff from left eigenvectors and right eigenvectors (how???) (can i just use right eigenvectors?)
 	
 	
 	//For loop upto k terms
@@ -659,7 +659,7 @@ void factorization(float complex* upper_h, float complex *krylov, int n, int min
 	   float complex vec[k*jj];
 	   if(has_converged(vals_eff[jj],vals_eff,k)==1){
 	   
-	   // Create a eiggenvector matrix with upto jj krylov vectors
+	   // Create a eigenvector matrix with upto jj krylov vectors
 	      for(int i=0;i<k;i++){
 	      	for(int j=0;j<jj;j++){
 	      	    vec[i*jj + j] = vecs_eff[i*jj + j];
@@ -675,11 +675,13 @@ void factorization(float complex* upper_h, float complex *krylov, int n, int min
                 }
             }
             
-            //Call arnoldi and get upper hessenburg and krylov subspace (ask how they have reshaped vec to sqrtm,sqrtm when the dimensions of vec are m*jj)
+           //Call arnoldi and get upper hessenburg and krylov subspace (ask how they have reshaped vec to sqrtm,sqrtm when the dimensions of vec are m*jj)
+           
+           
+           //Create decomposition function to get complete eigenvalues and eigenvectors from upper hessenburg (ask if you need to check convergence)  
             
-            //Create decomposition function to get complete eigenvalues and eigenvectors from upper hessenburg (ask if you need to check convergence)
             
-            //Pass the created eigenvalues and eigenvectors to function time_evolve to get eigenstates
+           //Pass the created eigenvalues and eigenvectors to function time_evolve to get eigenstates 
             
               
 	      
@@ -695,11 +697,14 @@ void time_evolve(float complex* eigenvals, int eigenvals_size,float complex* eig
 {
      float complex result[rows_eigenvecs*cols_eigenvecs];
      float complex values[eigenvals_size];
+     float complex values2d[eigenvals_size*eigenvals_size];
      
      for(int i=0;i<eigenvals_size;i++){
         values[i]= exp(eigenvals[i]*-1);
      }
      
+     
+     // Creating dagger of eigenvectors
      for(int i=0;i<rows_eigenvecs;i++)
   {
   	for(int j=0;j<cols_eigenvecs;j++)
@@ -708,17 +713,39 @@ void time_evolve(float complex* eigenvals, int eigenvals_size,float complex* eig
   	}
   }
   
+  // Creating diagonal matrix of eigenvalues
+  for(int i=0;i<eigenvals_size;i++){
+     for(int j=0;j<eigenvals_size;j++){
+         if(i==j){
+         	values2d[i*eigenvals_size + j] = values[j];
+         }
+         else{
+              values2d[i*eigenvals_size + j] = 0;
+         }
+         
+     }
+  }
+  
+  
   //Dot product as cols and rows are reversed   
      for (int i = 0; i < cols_eigenvecs; i++) {
          for (int j = 0; j < rows_eigenvecs; j++) {
-		result[i*rows_eigenvecs +j] = 0.0;
+		result[i*cols_eigenvecs +j] = 0.0;
 		for (int l = 0; l < eigenvals_size; l++) {
-		    result[i*rows_eigenvecs + j] += values[l]*result[l*rows_eigenvecs + j];
+		    result[i*cols_eigenvecs + j] += values[j*eigenvals_size + l]*result[l*rows_eigenvecs + j];
 	}
      }
    }    
     
-  //how to do dot product of U with the above as eigenvals is a 1d array (ask???) and then what to do??
+ // Dot product 
+    for (int i = 0; i < rows_eigenvecs; i++) {
+         for (int j = 0; j < cols_eigenvecs; j++) {
+		result[i*rows_eigenvecs +j] = 0.0;
+		for (int l = 0; l < eigenvals_size; l++) {
+		    result[i*rows_eigenvecs + j] += eigenvecs[j*eigenvals_size + l]*values[l*eigenvals_size + j];
+	}
+     }
+   }
            
 }
 
