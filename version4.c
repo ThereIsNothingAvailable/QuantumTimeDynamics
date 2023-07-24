@@ -502,7 +502,7 @@ void arnoldilindbard(float complex* op,float complex** dis_ops, float* rho,int s
         }
     }*/
     
-    factorization(h,Q_1,n,min_check,how_often,m);
+    factorization(h,Q_1,n,min_check,how_often,m,initial_dm);
    
     
     free(initial_dm);
@@ -578,7 +578,7 @@ void arnoldi(float complex *A, int N, float *v, int m, int n, float complex *H, 
 }
 
 //Define the function factorization to get eigenvalues and eigenvectors
-void factorization(float complex* upper_h, float complex *krylov, int n, int min_check,int how_often,int m)
+void factorization(float complex* upper_h, float complex *krylov, int n, int min_check,int how_often,int m, float* density_init )
 {
    for(int k=0;k<(n+1);k++)
    {
@@ -682,13 +682,13 @@ void factorization(float complex* upper_h, float complex *krylov, int n, int min
           
             
            //Pass the created qq matrix to time_evolve to get eigenstates and eigenvalues by using cgeev and then get sigenstates in way you understood
-            time_evolve(result,sqrt(m),sqrt(m),states);
+            time_evolve(result,sqrt(m),sqrt(m),states, vec_init, density_init);
             
             
             free(result);
 	      
 	   }
-	}*/
+	}
 	   	
 	
 	}}
@@ -696,16 +696,32 @@ void factorization(float complex* upper_h, float complex *krylov, int n, int min
 
 // Define the time evolution to get evolved eigenstates of the iterative function within the factorization() 
 // Only function left to complete
-void time_evolve(float complex* matrix, int rows,int cols,float complex* eigenstates)
+float complex* time_evolve(float complex* matrix, int rows,int cols,float complex* eigenstates, float* initial_rho)
 {
 	int n = rows;
         fcomplex qq[rows*cols]; // Submatrix
-          for (int i = 0; i < rows; i++) {
+        float complex left[rows*cols];
+        float complex right[rows*cols];
+        float complex* left_dag = (float complex*)malloc(n*n * sizeof(float complex));
+	float complex* norm = (float complex*)malloc(n*n * sizeof(float complex));
+	float complex* rho_t0 = (float complex*)malloc(n*n* sizeof(float complex));
+	float complex* vals = (float complex*)malloc(n*n* sizeof(float complex));
+	float complex* left_dag_res = (float complex*)malloc(n*n* sizeof(float complex));
+	float complex* right_res = (float complex*)malloc(n*n* sizeof(float complex));
+	
+	for (int i = 0; i < rows; i++) {
+        	for (int j = 0; j < cols; j++) {
+            		rho_t0[i*cols+j] = initial_rho[i*cols+j];
+            		rho_t0[i*cols+j] = cimag(0);
+        		}
+    		} 
+	
+        for (int i = 0; i < rows; i++) {
         	for (int j = 0; j < cols; j++) {
             		qq[i*cols+j].re = creal(matrix[i*cols+j]);
             		qq[i*cols+j].im = cimag(matrix[i*cols+j]);
         		}
-    		}  
+    		}    
     		
     		
     	// LAPACK function to compute eigenvalues and eigenvectors
@@ -730,7 +746,75 @@ void time_evolve(float complex* matrix, int rows,int cols,float complex* eigenst
 	if( info > 0 ) {
 	   printf( "The algorithm failed to compute eigenvalues.\n" );
 	   exit( 1 );
-	 }     
+	 }
+	 
+	  // Store the left eigenvectors
+	if (jobvl == 'V') {
+	    for (int i = 0; i < n; i++) {
+		for (int j = 0; j <n; j++) {
+			left[i*n+j] = vl[i*n+j].re;
+			left[i*n+j] = vl[i*n+j].im;
+		}
+	    }
+	}    
+
+	 // Store the right eigenvectors
+	if (jobvr == 'V') {
+	    for (int i = 0; i < n; i++) {
+		for (int j = 0; j <n; j++) {
+			right[i*n+j] = vr[i*n+j].re;
+			right[i*n+j] = vr[i*n+j].im;
+		}
+	    }
+	}
+	
+	// Store eigenvalues within a diagonal matrix
+	for (int i = 0; i < n; i++) {
+	    for(int j=0;j<n;j++){
+	        if(i==j){
+	                vals[i*n + j] = w[j].re;	
+		        vals[i*n + j] = w[j].im;	
+	        }
+	        else
+	               vals[i*n + j] = 0;
+	    }
+	}
+	
+	// Compute the conjugate transpose of left and right eigenvectors
+	dag(left,n,left_dag);
+
+	// Matrix mulitplication of left_dag and right
+	matrix_mul(left_dag,n,right,n,norm);
+	
+	
+	//Normalization of left_dag and right
+	for(int i =0;i<n;i++){
+	   for(int j=0;j<n;j++){
+	       right[i*n + j] = right[i*n + j]/sqrt(norm[i*n + j]);
+	       left_dag[i*n + j] = left_dag[i*n + j]/sqrt(norm[i*n + j]); 
+	   }
+	}
+	
+	// Can take t from user also, but for now take arbitrary value
+	float t = 145.56f;
+	
+	//Create a matrix with e^lamda(t-t0), assuming t0 = 0
+	for(int i =0;i<n;i++)
+	{
+	   for(int j =0;j<n;j++){
+	       vals[i*n+j] = exp(vals[i*n + j]*t);
+	   }
+	}
+	
+	//To create the eigenstates 
+	matrix_mul(left_dag,n,rho_t0,n,left_dag_res);
+	matrix_mul(right,n,vals,n,right_res);
+	matrix_mul(left_dag_res,n,right_res,n,eigenstates);
+	
+	return eigenstates;
+	
+	 
+	     
 }
 
 
