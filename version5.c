@@ -518,7 +518,7 @@ void arnoldilindbard(float complex* op,float complex** dis_ops, float* rho,int s
     free(tlist);
 }
 
-// Define the arnoldi iteration
+// Define the arnoldi iteration (can use optimization)
 void arnoldi(float complex *A, int N, float *v, int m, int n, float complex *H, float complex *Q) {
     float complex *v_k = (float complex *)malloc(N * sizeof(float complex));
     float complex *q_k = (float complex *)malloc(m * sizeof(float complex));
@@ -674,14 +674,6 @@ void factorization(float complex* upper_h, float complex *krylov, int n, int min
 	      	}
 	      }
 	      
-	  // Print vec 
-	     /*for(int i=0;i<k;i++){
-		 for(int j=0;j<jj;j++){   
-			if(vec[i*jj + j] != 0.0f){
-			      printf("%.2f + %.2fi",creal(vec[i*jj + j]), cimag(vec[i*jj + j]));
-			}
-	    }
-	}*/
 	      
 	  // Dot product   
 	  for (int i = 0; i < m; i++) {
@@ -691,7 +683,8 @@ void factorization(float complex* upper_h, float complex *krylov, int n, int min
 		        result[i*jj + j] = result[i*jj + j]+ krylov[i*k + l] * vec[l*jj + j];
 		    }
                 }
-            }  
+            }
+               
             
             //Convert qq matrix to square form to pass to time_evolve (as done in python)
             int qq_size=m*jj;
@@ -785,7 +778,7 @@ void factorization(float complex* upper_h, float complex *krylov, int n, int min
 		    }
 		}
 		
-		
+
 		
 		// Compute the conjugate transpose of left and right eigenvectors
 		dag(left,n1,left_dag);
@@ -803,13 +796,7 @@ void factorization(float complex* upper_h, float complex *krylov, int n, int min
 		       }
 		   }
 		}
-		
-		printf("Matrix of left eigenvectors conjugate transpose : ");
-		for(int i=0; i< n1; i++){
-		       for(int j=0;j<n1;j++){
-		           printf("%.2f + %.2fi",creal(right[i * n1 + j]),cimag(right[i * n1 + j]));
-		       }
-		    }
+	
 		
 		// Can take t from user also, but for now take arbitrary value
 		float t = 145.56f;
