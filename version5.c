@@ -785,51 +785,55 @@ void factorization(float complex* upper_h, float complex *krylov, int n, int min
 		    }
 		}
 		
-		printf("Left eigenvectors : ");
-		for(int i=0; i< n1; i++){
-		       for(int j=0;j<n1;j++){
-		           printf("%.21f + %.21fi",creal(right[i * n1 + j]),cimag(right[i * n1 + j]));
-		       }
-		    }
+		
 		
 		// Compute the conjugate transpose of left and right eigenvectors
-		/*dag(left,n,left_dag);
+		dag(left,n1,left_dag);
 
 		// Matrix mulitplication of left_dag and right
-		matrix_mul(left_dag,n,right,n,norm);
+		matrix_mul(left_dag,n1,right,n1,norm);
 		
 		
 		//Normalization of left_dag and right
-		for(int i =0;i<n;i++){
-		   for(int j=0;j<n;j++){
-		       right[i*n + j] = right[i*n + j]/sqrt(norm[i*n + j]);
-		       left_dag[i*n + j] = left_dag[i*n + j]/sqrt(norm[i*n + j]); 
+		for(int i =0;i<n1;i++){
+		   for(int j=0;j<n1;j++){
+		       if(norm[i*n1 + j]!=0.0f){
+		          right[i*n1 + j] = right[i*n1 + j]/sqrt(norm[i*n1 + j]);
+		          left_dag[i*n1 + j] = left_dag[i*n1 + j]/sqrt(norm[i*n1 + j]); 
+		       }
 		   }
 		}
+		
+		printf("Matrix of left eigenvectors conjugate transpose : ");
+		for(int i=0; i< n1; i++){
+		       for(int j=0;j<n1;j++){
+		           printf("%.2f + %.2fi",creal(right[i * n1 + j]),cimag(right[i * n1 + j]));
+		       }
+		    }
 		
 		// Can take t from user also, but for now take arbitrary value
 		float t = 145.56f;
 		
 		//Create a matrix with e^lamda(t-t0), assuming t0 = 0
-		for(int i =0;i<n;i++)
+		for(int i =0;i<n1;i++)
 		{
-		   for(int j =0;j<n;j++){
-		       vals[i*n+j] = exp(vals[i*n + j]*t);
+		   for(int j =0;j<n1;j++){
+		       vals[i*n1+j] = exp(vals[i*n1 + j]*t);
 		   }
 		}
 		
+		
 		//To create the eigenstates 
-		matrix_mul(left_dag,n,rho_t0,n,left_dag_res);
-		
-		
-	       matrix_mul(right,n,vals,n,right_res);
-		matrix_mul(left_dag_res,n,right_res,n,eigenstates);
-		
-		for(int i=0; i< n; i++){
-		       for(int j=0;j<n;j++){
-		           printf("%.2f + %.2fi",creal(eigenstates[i * n + j]),cimag(eigenstates[i * n + j]));
+		matrix_mul(left_dag,n1,rho_t0,n1,left_dag_res);
+	       matrix_mul(right,n1,vals,n1,right_res);
+	       matrix_mul(left_dag_res,n1,right_res,n1,states);
+	       
+		/*printf("Matrix of eigenstates : ");
+		for(int i=0; i< n1; i++){
+		       for(int j=0;j<n1;j++){
+		           printf("%.2f + %.2fi",creal(states[i * n1 + j]),cimag(states[i * n1 + j]));
 		       }
-		    }
+		    }*/
             
             
             
